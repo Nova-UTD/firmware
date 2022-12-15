@@ -1,3 +1,28 @@
+# CAN buses
+Hail-Bopp has two CAN buses. One is the CAN bus that came with our stock vehicle, and the other we added to support the EPAS and other peripherals.
+
+We call the former the **GEM Bus**, as it is the default bus that came with the Polaris GEM e6.
+
+We call the latter the **Robot Bus**, as it supports our autonomous functionality.
+
+## GEM Bus
+Bitrate is 250,000 bits per second.
+> ⚠ If a device (e.g. a CANable) connects to the GEM Bus at a rate other than 250kBps, the vehicle ***will shut down***.
+
+## Robot Bus
+Bitrate is 500,000 bits per second.
+
+## EPAS
+Our Electronic Power Assisted Steering (EPAS) system is managed by an [EPAS18 Ultra](https://www.dcemotorsport.com/Home/EPASFileDownload?file=EPAS18_Ultra_User_Guide_V2.1_USA.pdf&site=us) controller. The Ultra acts as an intermediary between other CAN devices and the actual steering motor.
+
+### Messages
+The Ultra uses a 500kBps CAN connection with **non-extended (11-bit) message IDs**. To send a command to the EPAS using python-can, you must explicitly specify a non-extended ID.
+
+Example:
+```python
+message = can.Message(arbitration_id=0x296, data=data, is_extended_id=False)
+```
+
 ### CAN message #1: Incoming
 
 - ID: 0x290 (decimal 656)
@@ -93,3 +118,4 @@ Message: `01 8F 70 00 00 00 00 00 `
 ##### Rules
 
 $Torque_A + Torque_B = 255$
+
