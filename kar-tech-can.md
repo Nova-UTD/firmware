@@ -8,6 +8,18 @@
 - ⚠ If the actuator does not receive a command within **1 second**, if will turn off the clutch and enter safe mode. Suggested refresh rate is 100 ms.
 - The datasheet notes that for proper care, the clutch should be enabled *at least 20ms before* the motor is enabled, and the motor should be disabled *at least 20ms before disabling the clutch*.
 
+## Basic specs
+
+| Item                      | Value                         |
+| ------------------------- | ----------------------------- |
+| Input voltage             | 10-30VDC                      |
+| Max current               | 5.8A                          |
+| Operating temperature     | -40$\degree$C to 85$\degree$C |
+| Actuator working distance | 3.1 inches                    |
+| CAN baud rate             | 250K (default) or 500K        |
+
+
+
 ## General message format
 
 Uses 29-bit "extended" CAN2.0b IDs.
