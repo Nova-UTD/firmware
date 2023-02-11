@@ -6,6 +6,11 @@ import time
 import can
 import inputs
 from inputs import get_gamepad
+import numpy as np
+from tqdm import trange, tqdm
+
+COMMAND_ID = 0xFF0000
+REPORT_ID = 0xFF0001
 
 
 class LAController:
@@ -43,103 +48,107 @@ class LAController:
         print(
             f"Pos: {shaft_extension_inches} inches, status: {fault_code}, current: {current_mA} mA")
 
-    def sendToPosition(self, pos: float):
+    def enableClutch(self, bus: can.Bus):
+        clutch_enable = True
+        motor_enable = False
+        clutch_enable_byte = clutch_enable * 0x80
+        motor_enable_byte = motor_enable * 0x40
+        byte3 = clutch_enable_byte + motor_enable_byte
+
+        data = [0x0F, 0x4A, 0, byte3, 0, 0, 0]
+
+        message = can.Message(
+            arbitration_id=COMMAND_ID, data=data, is_extended_id=True)
+
+        msg = bus.recv(0.1)
+        return msg
+
+    def disableClutch(self, bus: can.Bus):
+        clutch_enable = False
+        motor_enable = False
+        clutch_enable_byte = clutch_enable * 0x80
+        motor_enable_byte = motor_enable * 0x40
+        byte3 = clutch_enable_byte + motor_enable_byte
+
+        data = [0x0F, 0x4A, 0, byte3, 0, 0, 0]
+
+        message = can.Message(
+            arbitration_id=COMMAND_ID, data=data, is_extended_id=True)
+
+        msg = bus.recv(0.1)
+        return msg
+
+
+    def sendToPosition(self, pos: float, bus: can.Bus):
         """Given position, send appropriate CAN messages to LA
 
         Args:
             pos (float): Position from 0.0 (fully extended) to 1.0 (fully retracted)
+
+        Position command format:
+        [0x0F 0x4A  DPOS_LOW Byte3 0 0 0 0]
+
+        Byte 3:
+        [ClutchEnable MotorEnable POS7 POS6 POS5 POS4 POS3]
         """
-        request_confirmation = True
-        request_auto_reply = True
+
+        POSITION_MAX = 3.45
+        POSITION_MIN = 0.80
+        range = POSITION_MAX - POSITION_MIN
+        pos_inches = pos * range + POSITION_MIN
+
+        # Account for 0.5 inch offset
+        pos_value = int(pos_inches * 1000) + 500
+
+        dpos_hi = int(pos_value / 0x100)
+        dpos_low = pos_value % 0x100
+
+        clutch_enable = True
+        motor_enable = True
+        clutch_enable_byte = clutch_enable * 0x80
+        motor_enable_byte = motor_enable * 0x40
+        byte3 = sum([dpos_hi, clutch_enable_byte, motor_enable_byte])
+
+        data = [0x0F, 0x4A, dpos_low, byte3, 0, 0, 0]
+        # print(hex(clutch_enable_byte))
+        # print(hex(motor_enable_byte))
+        # print(hex(byte3))
+
+        message = can.Message(
+            arbitration_id=COMMAND_ID, data=data, is_extended_id=True)
+
+        bus.send(message)
+
+        msg = bus.recv(0.1)
+
+        return msg
 
     def run(self, channel, bitrate):
-        with can.interface.Bus(bustype='slcan', channel=channel, bitrate=bitrate, receive_own_messages=True) as bus:
-            with open('out.csv', 'w') as f:
+        print("Opening bus... ", end="")
+        bus = can.interface.Bus(
+            bustype='slcan', channel=channel, bitrate=bitrate, receive_own_messages=True)
+        print("Bus open.")
 
-                COMMAND_ID = 0xFF0000
-                REPORT_ID = 0xFF0001
+        x = np.linspace(0.0, 4*np.pi, 201)
+        positions = (np.sin(x) + 1.0) / 2
+        print(positions)
 
-                # Just enable clutch
-                command_data = [0x0F, 0x4A, 0xC4, 0x89, 0, 0, 0, 0]
-                message = can.Message(
-                    arbitration_id=COMMAND_ID, data=command_data, is_extended_id=True)
-                bus.send(message)
+        self.enableClutch(bus=bus)
 
-                msg = bus.recv(0.2)
-                if (msg is None):
-                    print("Skipping")
-                else:
-                    self.parseResponseMsg(msg)
+        for pos in tqdm(positions):
+            response = self.sendToPosition(pos, bus=bus)
+            time.sleep(0.05)
+            # print(pos, end=" ")
+            # self.parseResponseMsg(response)
 
-                time.sleep(0.025)
+        self.disableClutch(bus=bus)
 
-                # Clutch and motor on. Move to 2"
-                command_data = [0x0F, 0x4A, 0xC4, 0x89, 0, 0, 0, 0]
-                message = can.Message(
-                    arbitration_id=COMMAND_ID, data=command_data, is_extended_id=True)
-                bus.send(message)
-
-                msg = bus.recv(0.2)
-                if (msg is None):
-                    print("Skipping")
-                else:
-                    self.parseResponseMsg(msg)
-
-                time.sleep(1.0)
-
-                # Clutch and motor on. Move to ?"
-                command_data = [0x0F, 0x4A, 0xC4, 0x8F, 0, 0, 0, 0]
-                message = can.Message(
-                    arbitration_id=COMMAND_ID, data=command_data, is_extended_id=True)
-                bus.send(message)
-
-                msg = bus.recv(0.2)
-                if (msg is None):
-                    print("Skipping")
-                else:
-                    self.parseResponseMsg(msg)
-
-                time.sleep(1.0)
-
-                # Clutch and motor on. Move to 2"
-                command_data = [0x0F, 0x4A, 0xC4, 0x89, 0, 0, 0, 0]
-                message = can.Message(
-                    arbitration_id=COMMAND_ID, data=command_data, is_extended_id=True)
-                bus.send(message)
-
-                msg = bus.recv(0.2)
-                if (msg is None):
-                    print("Skipping")
-                else:
-                    self.parseResponseMsg(msg)
-
-                time.sleep(1.0)
-
-                # Just enable clutch (again)
-                command_data = [0x0F, 0x4A, 0xC4, 0x89, 0, 0, 0, 0]
-                message = can.Message(
-                    arbitration_id=COMMAND_ID, data=command_data, is_extended_id=True)
-                bus.send(message)
-
-                msg = bus.recv(0.2)
-                if (msg is None):
-                    print("Skipping")
-                else:
-                    self.parseResponseMsg(msg)
-
-                time.sleep(0.025)
-
-                # Disable clutch and motor
-                command_data = [0x0F, 0x4A, 0xD0, 0x07, 0, 0, 0, 0]
-                message = can.Message(
-                    arbitration_id=COMMAND_ID, data=command_data, is_extended_id=True)
-                bus.send(message)
-
-                msg = bus.recv(0.2)
-                if (msg is None):
-                    print("Skipping")
-                else:
-                    self.parseResponseMsg(msg)
+        # self.sendToPosition(0.0, bus=bus)
+        # time.sleep(0.4)
+        # self.sendToPosition(0.5, bus=bus)
+        # time.sleep(1.4)
+        # self.sendToPosition(1.0, bus=bus)
+        # time.sleep(2.4)
 
 
 if __name__ == "__main__":
