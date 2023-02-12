@@ -1,9 +1,9 @@
 # #!/usr/bin/env python
 
 import can
-import inputs
+# import inputs
 import math
-from inputs import get_gamepad
+# from inputs import get_gamepad
 
 class Controller:
     joystick_pos = 0.0 # Scaled value of Xbox joystick, from [-1.0, 1.0]
@@ -38,7 +38,7 @@ class Controller:
         current_angle_normalized = ((self.steering_angle-self.limit_left)/(self.limit_right-self.limit_left)*2)-1
         
 
-        e = self.joystick_pos - current_angle_normalized # Error = target - current
+        e = 0.0 - current_angle_normalized # Error = target - current
 
         # We need to map [-1.0, 1.0] to [0, 255]
 
@@ -58,30 +58,27 @@ class Controller:
 
     def run(self, channel='COM1'):
         with can.interface.Bus(bustype='slcan', channel=channel, bitrate=500000, receive_own_messages=True) as bus:
-            with open('out.csv', 'w') as f:
-                # CSV file header
-                f.write('Torque,Duty %,Current (A),Supply Voltage (V), Switch pos, Temp (C), Torque A, Torqe B, Angle, Analog C1, Analog C2, Map, Errors, DIO, Status, Limit\n')
+         
+            cached_msg1 = None
 
-                cached_msg1 = None
+            while (True):
+                # bus.send(message, timeout=0.2)
+                # print(f"Sending {message}")
+                msg = bus.recv(0.2)
+                if (msg is None):
+                    print("Skipping")
+                elif (msg.arbitration_id == 0x290):
+                    cached_msg1 = msg.data
+                elif(msg.arbitration_id == 0x292):
+                    if (cached_msg1 is not None):
+                        self.parse_msgs(cached_msg1, msg.data)
 
-                while (True):
-                    # bus.send(message, timeout=0.2)
-                    # print(f"Sending {message}")
-                    msg = bus.recv(0.2)
-                    if (msg is None):
-                        print("Skipping")
-                    elif (msg.arbitration_id == 0x290):
-                        cached_msg1 = msg.data
-                    elif(msg.arbitration_id == 0x292):
-                        if (cached_msg1 is not None):
-                            f.write(self.parse_msgs(cached_msg1, msg.data))
-
-                    events = get_gamepad()
-                    for event in events:
-                        if str(event.code) == "ABS_X":
-                            self.joystick_pos = event.state / 32800 # Divide by joystick-specific max value
-                    self.send_command(bus)
+                # events = get_gamepad()
+                # for event in events:
+                #     if str(event.code) == "ABS_X":
+                #         self.joystick_pos = event.state / 32800 # Divide by joystick-specific max value
+                self.send_command(bus)
 
 if __name__ == "__main__":
     controller = Controller()
-    controller.run('COM3')
+    controller.run('/dev/serial/by-id/usb-Protofusion_Labs_CANable_1205aa6_https:__github.com_normaldotcom_cantact-fw_001500174E50430520303838-if00')

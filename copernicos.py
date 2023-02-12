@@ -21,12 +21,14 @@ See readme for more information.
 import asyncio
 import gc
 import sys
+import time
 from io import StringIO
 
 import board
 from analogio import AnalogOut
 import neopixel
 import digitalio
+import supervisor # serial_bytes_available()
 
 VERSION = "1.0"
 
@@ -68,6 +70,14 @@ class SystemStatus:
     WARN = 2
     FAULTY = 3
 
+class Error:
+    invalid_input = False
+
+    def __init__(self, invalid_input = False):
+        invalid_input = invalid_input
+
+    def getBinary(self):
+        return bin(int(self.invalid_input))
 
 class CopernicOS:
 
@@ -85,6 +95,14 @@ class CopernicOS:
         self.status_pixel.brightness = 0.3
         print("* IO has been configured")
 
+        # Control variables
+        self.target_throttle = 0.0
+        self.command_str = ""
+
+        # Safety variables
+        self.THROTTLE_INPUT_TIMEOUT = 0.5 # sec
+        self.last_throttle_input_time: float = -1.0
+
     async def setStatusLed(self):
         """Sets the built-in neopixel according to system status
         """
@@ -99,17 +117,78 @@ class CopernicOS:
 
         await asyncio.sleep(0.5)
 
-    def setThrottle(throttle_value: float):
+    async def checkForInput(self):
+        if not supervisor.runtime.serial_connected:
+            # USB serial not available
+            self.status = SystemStatus.WARN
+            return
+        if not supervisor.runtime.serial_bytes_available:
+            # No serial data in buffer
+            await asyncio.sleep(0.05)
+            return
+
+
+        while supervisor.runtime.serial_bytes_available:
+            char = sys.stdin.read(1)
+            self.command_str += char
+            if char == '$':
+                # Beginning of new command
+                self.command_str = ""
+            elif char == ';':
+                # Command is complete
+                self.command_str = self.command_str[:-1]
+                parts = self.command_str.split(',')
+                self.target_throttle = float(parts[1])
+                self.last_throttle_input_time = time.time()
+
+                # Flush the buffer
+                trash = input()
+
+                print(self.command_str)
+            
+            
+        # print(self.command_str)
+        return
+        
+        # Parse the input
+        command_str = input()
+        parts = command_str.split(',')
+        if len(parts) < 2:
+            print("Error: Commands must have at least 2 parts")
+            return
+
+        if parts[0].lower() == 'throttle':
+            print(parts[1])
+            print(f"Setting throttle to {float(parts[1])}")
+            # self.setThrottle(float(parts[1]))
+            self.target_throttle = float(parts[1])
+            self.last_throttle_input_time = time.time()
+        else:
+            print("Error: Unrecognized command.")
+            return
+
+    async def setThrottle(self,):
         """Sets voltage lines to emulate throttle pedal
 
         Args:
             throttle_value (float): Between 0.0-1.0, where 1.0 is full throttle.
         """
 
+        # Compare current time with time last input was received
+        dt = time.time() - self.last_throttle_input_time
+        if dt > self.THROTTLE_INPUT_TIMEOUT:
+            self.target_throttle = 0.0
+            self.status = SystemStatus.IDLE
+        else:
+            self.status = SystemStatus.ACTIVE
+
         # Voltages for channels 1 and 2 of the
         # accelerator position sensor (APS)
-        volt_c1 = (0.1809*throttle_value) + 0.8335
-        volt_c2 = (0.3949*throttle_value) + 1.6996
+        volt_c1 = (0.1809*self.target_throttle) + 0.8335
+        volt_c2 = (0.3949*self.target_throttle) + 1.6996
+
+        self.aps_c1_out.value = int(((volt_c1 / 3.3) * 1024) * 64)
+        self.aps_c2_out.value = int(((volt_c2 / 3.3) * 1024) * 64)
 
     async def spin(self):
         
@@ -121,105 +200,9 @@ class CopernicOS:
         while True:                         # for each line
             try:
                 led_task = asyncio.create_task(self.setStatusLed())
-                await asyncio.gather(led_task)
-            #     index = 0
-            #     line = ''
-
-            #     while True:                   # for each character
-            #         ch = ord(sys.stdin.read(1))
-
-            #         if 32 <= ch <= 126:           # printable character
-            #             line = line[:index] + chr(ch) + line[index:]
-            #             index += 1
-
-            #         elif ch in {10, 13}:          # EOL - try to process
-            #             if input:
-            #                 input = input + ' ' + line.strip()
-            #             else:
-            #                 input = line.strip()
-            #             line = ''
-            #             try:
-            #                 print(f"\nParsing command '{input}'")
-            #                 input = ''
-            #             except SyntaxError as e:
-            #                 if str(e) != 'unexpected EOF in list':
-            #                     sys.stdout.write('\n')
-            #                     sys.stdout.write(str(e))
-            #                     input = ''
-            #             sys.stdout.write('\n')
-            #             break
-
-            #         #####################
-
-            #         elif ch == 1:             # CTRL-A: start of line
-            #             index = 0
-
-            #         elif ch == 5:             # CTRL-E: end of line
-            #             index = len(line)
-
-            #         #####################
-
-            #         elif ch == 2:             # CTRL-B: back a word
-            #             while index > 0 and line[index-1] == ' ':
-            #                 index -= 1
-            #             while index > 0 and line[index-1] != ' ':
-            #                 index -= 1
-
-            #         elif ch == 6:             # CTRL-F: forward a word
-            #             while index < len(line) and line[index] == ' ':
-            #                 index += 1
-            #             while index < len(line) and line[index] != ' ':
-            #                 index += 1
-
-            #         #####################
-
-            #         elif ch == 4:             # CTRL-D: delete forward
-            #             if index < len(line):
-            #                 line = line[:index] + line[index+1:]
-
-            #         elif ch == 11:            # CTRL-K: clear to end of line
-            #             line = line[:index]
-
-            #         elif ch in {8, 127}:     # backspace/DEL
-            #             if index > 0:
-            #                 line = line[:index - 1] + line[index:]
-            #                 index -= 1
-
-            #         #####################
-
-            #         elif ch == 20:            # CTRL-T: transpose characters
-            #             if index > 0 and index < len(line):
-            #                 ch1 = line[index - 1]
-            #                 ch2 = line[index]
-            #                 line = line[:index - 1] + \
-            #                     ch2 + ch1 + line[index + 1:]
-
-            #         #####################
-
-            #         elif ch == 27:            # ESC
-            #             next1, next2 = ord(sys.stdin.read(1)), ord(
-            #                 sys.stdin.read(1))
-            #             if next1 == 91:           # [
-            #                 if next2 == 68:       # left arrow
-            #                     if index > 0:
-            #                         index -= 1
-            #                     else:
-            #                         sys.stdout.write('\x07')
-            #                 elif next2 == 67:     # right arrow
-            #                     if index < len(line):
-            #                         index += 1
-            #                     else:
-            #                         sys.stdout.write('\x07')
-
-            #         else:
-            #             print('Unknown character: {0}'.format(ch))
-
-            #         # Update screen
-            #         sys.stdout.write("\x1b[1000D")  # Move all the way left
-            #         sys.stdout.write("\x1b[0K")    # Clear the line
-            #         sys.stdout.write(line)
-            #         # Move all the way left again
-            #         # sys.stdout.flush()
+                serial_input_task = asyncio.create_task(self.checkForInput())
+                throttle_control_task = asyncio.create_task(self.setThrottle())
+                await asyncio.gather(led_task, serial_input_task)
             except Exception as e:
                 sys.stdout.write('\n')
                 print(e)
