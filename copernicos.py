@@ -14,6 +14,8 @@
 
 =Nova at UT Dallas=
 
+Maintainer: Jai Peris
+
 Real-time operating script for CircuitPython-based microcontrollers
 
 See readme for more information.
