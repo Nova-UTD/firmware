@@ -43,28 +43,6 @@ APS_CH1_PIN = board.A0
 APS_CH2_PIN = board.A1
 
 
-# def calc_volt(volt) -> int:
-#     return ((volt / 3.3) * 1024) * 64
-
-
-# def voltage(x):
-#     volt_o = (0.1809*x) + 0.8335
-#     volt_b = (0.3949*x) + 1.6996
-#     return volt_o, volt_b
-
-
-# analog_outO = AnalogOut(board.A0)
-# analog_outB = AnalogOut(board.A1)
-# # while (True):
-# #     input_num = input('Enter num between 0 and 1: ')
-# #     if input_num[0] == 't':
-# #         num = float(input_num[1:])
-# #         volt = voltage(input_num)
-# #         analog_outO.value = int(calc_volt(volt[0]))
-# #         analog_outB.value = int(calc_volt(volt[1]))
-# #         print(volt[0])
-# #         print(volt[1])
-
 
 class SystemStatus:
     IDLE = 0
@@ -128,46 +106,53 @@ class CopernicOS:
             # No serial data in buffer
             await asyncio.sleep(0.05)
             return
-
-
-        while supervisor.runtime.serial_bytes_available:
-            char = sys.stdin.read(1)
-            self.command_str += char
-            if char == '$':
-                # Beginning of new command
-                self.command_str = ""
-            elif char == ';':
-                # Command is complete
-                self.command_str = self.command_str[:-1]
-                parts = self.command_str.split(',')
-                self.target_throttle = float(parts[1])
-                self.last_throttle_input_time = time.time()
-
-                # Flush the buffer
-                trash = input()
-
-                print(self.command_str)
-            
-            
-        # print(self.command_str)
-        return
         
-        # Parse the input
-        command_str = input()
-        parts = command_str.split(',')
-        if len(parts) < 2:
-            print("Error: Commands must have at least 2 parts")
+        command = input()
+        try:
+            throttle = float(command)
+            self.target_throttle = throttle
+        except:
             return
+        self.last_throttle_input_time = time.time()
+        # print(f"throttle: {throttle}")
+        
 
-        if parts[0].lower() == 'throttle':
-            print(parts[1])
-            print(f"Setting throttle to {float(parts[1])}")
-            # self.setThrottle(float(parts[1]))
-            self.target_throttle = float(parts[1])
-            self.last_throttle_input_time = time.time()
-        else:
-            print("Error: Unrecognized command.")
-            return
+
+        # while supervisor.runtime.serial_bytes_available:
+        #     char = sys.stdin.read(1)
+        #     self.command_str += char
+        #     if char == '$':
+        #         # Beginning of new command
+        #         self.command_str = ""
+        #     elif char == ';':
+        #         # Command is complete
+        #         self.command_str = self.command_str[:-1]
+        #         parts = self.command_str.split(',')
+        #         # self.target_throttle = float(parts[1])
+        #         self.target_throttle = 1.0
+        #         self.last_throttle_input_time = time.time()
+
+        #         # Flush the buffer
+        #         trash = input()
+            
+        # return
+        
+        # # Parse the input
+        # command_str = input()
+        # parts = command_str.split(',')
+        # if len(parts) < 2:
+        #     print("Error: Commands must have at least 2 parts")
+        #     return
+
+        # if parts[0].lower() == 'throttle':
+        #     print(parts[1])
+        #     print(f"Setting throttle to {float(parts[1])}")
+        #     # self.setThrottle(float(parts[1]))
+        #     self.target_throttle = float(parts[1])
+        #     self.last_throttle_input_time = time.time()
+        # else:
+        #     print("Error: Unrecognized command.")
+        #     return
 
     async def setThrottle(self,):
         """Sets voltage lines to emulate throttle pedal
@@ -178,18 +163,23 @@ class CopernicOS:
 
         # Compare current time with time last input was received
         dt = time.time() - self.last_throttle_input_time
+        print(f"dt: {dt}")
         if dt > self.THROTTLE_INPUT_TIMEOUT:
             self.target_throttle = 0.0
             self.status = SystemStatus.IDLE
         else:
             self.status = SystemStatus.ACTIVE
 
+        print(f"Target: {self.target_throttle}")
+
         # Voltages for channels 1 and 2 of the
         # accelerator position sensor (APS)
-        volt_c1 = (0.1809*self.target_throttle) + 0.8335
-        volt_c2 = (0.3949*self.target_throttle) + 1.6996
+        # volt_c1 = (0.1809*self.target_throttle) + 0.8335
+        # volt_c2 = (0.3949*self.target_throttle) + 1.6996
+        volt_c2 = 0.6*self.target_throttle + 0.9
+        # volt_c1 = 0.0
 
-        self.aps_c1_out.value = int(((volt_c1 / 3.3) * 1024) * 64)
+        # self.aps_c1_out.value = int(((volt_c1 / 3.3) * 1024) * 64)
         self.aps_c2_out.value = int(((volt_c2 / 3.3) * 1024) * 64)
 
     async def spin(self):
@@ -198,8 +188,9 @@ class CopernicOS:
         line = ''
         index = 0
         ctrl_c_seen = False
+                    # for each line
 
-        while True:                         # for each line
+        while True:
             try:
                 led_task = asyncio.create_task(self.setStatusLed())
                 serial_input_task = asyncio.create_task(self.checkForInput())
