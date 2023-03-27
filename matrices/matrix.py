@@ -41,6 +41,8 @@ class RunText:
         font.LoadFont("data/karma1-mod.bdf")
         textColor = graphics.Color(255, 255, 255)
         pos = offscreen_canvas.width
+
+        # é is set to be a warning triangle in our custom font
         my_text = "é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING"
 
         while True:
