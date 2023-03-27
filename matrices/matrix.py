@@ -8,15 +8,14 @@ import time
 class RunText:
     def __init__(self, *args, **kwargs):
         # Create an RGBMatrix object
-        self.matrix = RGBMatrix(options = self.getOptions())
-
+        self.matrix = RGBMatrix(options=self.getOptions())
 
     def getOptions(self) -> RGBMatrixOptions:
         """Create and set an RGBMatrixOptions object
 
         Returns:
             RGBMatrixOptions
-        """        
+        """
 
         options = RGBMatrixOptions()
         options.rows = 32
@@ -35,16 +34,19 @@ class RunText:
         return options
 
     def run(self):
+        """Run main program animation in an inifite loop
+        """
         offscreen_canvas = self.matrix.CreateFrameCanvas()
         font = graphics.Font()
         font.LoadFont("data/karma1-mod.bdf")
-        textColor = graphics.Color(255,255,255)
+        textColor = graphics.Color(255, 255, 255)
         pos = offscreen_canvas.width
         my_text = "é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING"
 
         while True:
             offscreen_canvas.Clear()
-            len = graphics.DrawText(offscreen_canvas, font, pos, 26, textColor, my_text)
+            len = graphics.DrawText(
+                offscreen_canvas, font, pos, 26, textColor, my_text)
             pos -= 1
             if (pos + len < 0):
                 pos = offscreen_canvas.width
