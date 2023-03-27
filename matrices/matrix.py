@@ -21,12 +21,12 @@ class RunText:
         options = RGBMatrixOptions()
         options.rows = 32
         options.cols = 64
-        options.chain_length = 1
+        options.chain_length = 2
         options.parallel = 1
         options.row_address_type = 0
         options.multiplexing = 0
         options.pwm_bits = 11
-        options.brightness = 100
+        options.brightness = 80
         options.pwm_lsb_nanoseconds = 130
         options.led_rgb_sequence = "RGB"
         options.pixel_mapper_config = ""
@@ -37,10 +37,10 @@ class RunText:
     def run(self):
         offscreen_canvas = self.matrix.CreateFrameCanvas()
         font = graphics.Font()
-        font.LoadFont("data/karma2.bdf")
-        textColor = graphics.Color(255,0,0)
+        font.LoadFont("data/karma1-mod.bdf")
+        textColor = graphics.Color(255,255,255)
         pos = offscreen_canvas.width
-        my_text = "SELF-DRIVING // SELF-DRIVING // SELF-DRIVING // SELF-DRIVING"
+        my_text = "é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING é SELF-DRIVING"
 
         while True:
             offscreen_canvas.Clear()
@@ -49,7 +49,7 @@ class RunText:
             if (pos + len < 0):
                 pos = offscreen_canvas.width
 
-            time.sleep(0.01)
+            time.sleep(0.02)
             offscreen_canvas = self.matrix.SwapOnVSync(offscreen_canvas)
 
     def process(self):
