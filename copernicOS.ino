@@ -32,10 +32,8 @@ See readme for more information.
 Adafruit_NeoPixel led = Adafruit_NeoPixel(NEOPIXEL_COUNT, NEOPIXEL_PIN, NEO_GRB);
 
 // set I/O pins
-int APS_CH1_PIN_O = A0;
-int APS_CH2_PIN_O = A1;
-int APS_CH1_PIN_I = A2;
-int APS_CH2_PIN_I = A3;
+int APS_OUTPUT = A0;
+int APS_INPUT = A2;
 
 // Current version
 String VERSION = "1.0";
@@ -129,23 +127,17 @@ void setThrottle()
  */
 void setVoltage()
 {
-  int base_c1 = analogRead(APS_CH1_PIN_I);
-  int base_c2 = analogRead(APS_CH2_PIN_I);
+  int base = analogRead(APS_INPUT);
 
-  float volt_c1 = base_c1/1024.0*3.3;
-  float volt_c2 = base_c2/1024.0*3.3;
+  float input_voltage = base/1024.0*3.3;
   
   // 1.5 and 3.2 are the slopes of the linear regression lines for the APS
-  float v1 = 1.5 * target_throttle + volt_c1;
-  float v2 = 3.2 * target_throttle + volt_c2;
-
+  float output = 3.2 * target_throttle + input_voltage;
   
   // Vref for the GCM4 is 3.3, ADC resolution is 12 bits (4096)
-  analogWrite(APS_CH1_PIN_O, min(int(v1 / 3.3 * 4095), 4095)); // convert output to 8-bit PWM
-  analogWrite(APS_CH2_PIN_O, min(int(v2 / 3.3 * 4095), 4095)); // convert output to 8-bit PWM
+  analogWrite(APS_OUTPUT, min(int(output / 3.3 * 4095), 4095)); // convert output to 8-bit PWM
 
-
-  Serial.println("Throttle: " + String(target_throttle) + ", Voltage: " + String(v2));
+  Serial.println("Throttle: " + String(target_throttle) + ", Voltage: " + String(input_voltage));
 }
 
 /**
@@ -182,10 +174,8 @@ void setup()
   Serial.println("~~ Nova at UTD - nova-utd.github.io ~~\n");
 
   // set I/O
-  pinMode(APS_CH1_PIN_O, OUTPUT);
-  pinMode(APS_CH2_PIN_O, OUTPUT);
-  pinMode(APS_CH1_PIN_I, INPUT);
-  pinMode(APS_CH2_PIN_I, INPUT);
+  pinMode(APS_OUTPUT, OUTPUT);
+  pinMode(APS_INPUT, INPUT);
 
   // set serial timeout, 1 second
   Serial.setTimeout(SERIAL_TIMEOUT);
@@ -195,7 +185,7 @@ void setup()
 
   // set up neopixel
   led.begin();
-  led.setBrightness(30);
+  led.setBrightness(255);
   status = IDLE;
   setLed();
 }
