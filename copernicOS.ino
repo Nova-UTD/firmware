@@ -48,6 +48,8 @@ long int last_throttle_input_time = -1.0;
 // control variables
 float target_throttle = 0.0;
 
+String command = "";
+
 // enum used for system status
 enum SystemStatus
 { IDLE, ACTIVE, WARN, FAULTY };
@@ -75,8 +77,6 @@ void setLed()
  */
 void checkForInput()
 {
-  String command = "";
-
   while(Serial.available() > 0)
   {
     char c = Serial.read(); //read a single character from the buffer
@@ -137,7 +137,7 @@ void setVoltage()
   // Vref for the GCM4 is 3.3, ADC resolution is 12 bits (4096)
   analogWrite(APS_OUTPUT, min(int(output / 3.3 * 4095), 4095)); // convert output to 8-bit PWM
 
-  Serial.println("Throttle: " + String(target_throttle) + ", Voltage: " + String(input_voltage));
+  //Serial.println("Throttle: " + String(target_throttle) + ", Voltage: " + String(input_voltage));
 }
 
 /**
