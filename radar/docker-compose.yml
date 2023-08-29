@@ -1,0 +1,113 @@
+version: '2.3'
+name: delphi_esr
+services:
+    delphi_esr:
+        privileged: true
+        stdin_open: true
+        tty: true
+        runtime: nvidia
+
+        image: delphi_esr
+        container_name: delphi_esr_${USER}
+
+        volumes:     
+          - type: bind
+            source: $PWD
+            target: /radar
+          # this solves a peculiar issue trying to install linux-modules-extra-5.19.0-41-generic
+          # hack to help to share the modprobe kernel tools with the container:
+          # https://stackoverflow.com/questions/67807039/how-to-install-linux-modules-extras-in-a-ubuntu-18-04-docker-image
+          - type: bind
+            source: /lib/modules/5.19.0-41-generic
+            target: /lib/modules/5.19.0-41-generic
+          - type: bind
+            source: ${HOME}/.Xauthority
+            target: /root/.Xauthority
+          - type: bind
+            source: /tmp/.X11-unix
+            target: /tmp/.X11-unix
+          # need to enable shared memory for ros to communicate between docker containers - share /dev/shm
+          # see: https://answers.ros.org/question/370595/ros2-foxy-nodes-cant-communicate-through-docker-container-border/
+          # to share can connections, we share all of /dev
+          - type: bind
+            source: /dev
+            target: /dev
+
+        environment:
+          - DISPLAY=${DISPLAY}
+          - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+          - NVIDIA_VISIBLE_DEVICES=all
+          # Specify the ROS Middleware to be consistent across containers:
+          # see: https://discourse.ros.org/t/ros-cross-distribution-communication/27335
+          - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+        # deploy:
+        #   resources:
+        #     reservations:
+        #       devices:
+        #         - driver: nvidia
+        #           count: all
+        #           capabilities: [gpu]
+
+        build:
+          context: .
+          dockerfile: DelphiESR.Dockerfile
+        
+        network_mode: "host"
+
+    delphi_esr_bridge:
+        privileged: true
+        stdin_open: true
+        tty: true
+        runtime: nvidia
+
+        image: delphi_esr_bridge
+        container_name: delphi_esr_bridge_${USER}
+
+        volumes:     
+          #- type: bind
+          #  source: $PWD
+          #  target: /radar
+          #- type: bind
+          #  source: ~/navigator
+          #  target: /navigator
+          # this solves a peculiar issue trying to install linux-modules-extra-5.19.0-41-generic
+          # hack to help to share the modprobe kernel tools with the container:
+          # https://stackoverflow.com/questions/67807039/how-to-install-linux-modules-extras-in-a-ubuntu-18-04-docker-image
+          #- type: bind
+          #  source: /lib/modules/5.19.0-41-generic
+          #  target: /lib/modules/5.19.0-41-generic
+          - type: bind
+            source: ${HOME}/.Xauthority
+            target: /root/.Xauthority
+          - type: bind
+            source: /tmp/.X11-unix
+            target: /tmp/.X11-unix
+          # need to enable shared memory for ros to communicate between docker containers - share /dev/shm
+          # see: https://answers.ros.org/question/370595/ros2-foxy-nodes-cant-communicate-through-docker-container-border/
+          # to share can connections, we share all of /dev
+          - type: bind
+            source: /dev
+            target: /dev
+
+        environment:
+          - DISPLAY=${DISPLAY}
+          - ROS_DOMAIN_ID=${ROS_DOMAIN_ID}
+          - NVIDIA_VISIBLE_DEVICES=all
+          # Specify the ROS Middleware to be consistent across containers:
+          # see: https://discourse.ros.org/t/ros-cross-distribution-communication/27335
+          - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+
+        # deploy:
+        #   resources:
+        #     reservations:
+        #       devices:
+        #         - driver: nvidia
+        #           count: all
+        #           capabilities: [gpu]
+
+        build:
+          context: .
+          dockerfile: DelphiESRBridge.Dockerfile
+        
+        network_mode: "host"
